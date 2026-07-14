@@ -49,20 +49,20 @@ from hainaocr_nativepixel import (  # noqa: E402
 )
 from hainaocr_nativepixel.processing import load_tokenizer_with_fixes  # noqa: E402
 
-# ── HTML online render pipeline (optional) ──
-_HTML_RENDER_DIR = SCRIPT_DIR.parent / "data" / "haina_html_render"
-if str(_HTML_RENDER_DIR) not in sys.path:
-    sys.path.insert(0, str(_HTML_RENDER_DIR))
+# ── HTML online render pipeline (text2vision_pt) ──
+_T2V_DIR = SCRIPT_DIR.parent / "data" / "text2vision_pt"
+if str(_T2V_DIR) not in sys.path:
+    sys.path.insert(0, str(_T2V_DIR))
 _has_html_render = True
 try:
-    from html_ocr_dataset import HtmlRenderedOCRDataset  # noqa: E402
-    from html_ocr_renderer import BrowserConfig, HtmlOCRRenderer, RenderConfig  # noqa: E402
-    from haina_cpt_collator import HainaCPTCollator  # noqa: E402
+    from dataset.render_dataset import RenderDataset  # noqa: E402
+    from dataset.render_collator import RenderCollator  # noqa: E402
+    from rendering.html_ocr_renderer import BrowserConfig, HtmlOCRRenderer, RenderConfig  # noqa: E402
 except Exception:
     _has_html_render = False
-    HtmlRenderedOCRDataset = None
+    RenderDataset = None
+    RenderCollator = None
     HtmlOCRRenderer = None
-    HainaCPTCollator = None
 
 
 VISION_START = 151652
@@ -763,23 +763,18 @@ def train(cfg: Dict[str, Any]) -> None:
                 if not manifest_files:
                     raise FileNotFoundError(f"No manifest files matched: {html_manifest}")
                 renderer = HtmlOCRRenderer(
-                    RenderConfig(
-                        output_mode="uint8",
-                        width=int(data_cfg.get("render_width", 1024)),
-                        height=int(data_cfg.get("render_height", 512)),
-                        patch_size=int(data_cfg.get("render_patch_size", 32)),
-                    ),
+                    RenderConfig(output_mode="uint8"),
                     BrowserConfig(
                         executable_path=data_cfg.get("browser_path") or None,
                         katex_dist=data_cfg.get("katex_dist") or None,
                     ),
                 )
-                dataset = HtmlRenderedOCRDataset(
-                    manifest_files, renderer,
+                dataset = RenderDataset(
+                    manifest_files, renderer=renderer,
                     base_seed=int(cfg["training"]["seed"]),
                     rank=rank,
                 )
-                collator = HainaCPTCollator(
+                collator = RenderCollator(
                     tokenizer=tokenizer,
                     vision_start_id=VISION_START,
                     image_pad_id=IMAGE_PAD,
@@ -791,7 +786,6 @@ def train(cfg: Dict[str, Any]) -> None:
                 loader = DataLoader(
                     dataset,
                     batch_size=int(cfg["training"]["micro_batch_size"]),
-                    shuffle=True,
                     collate_fn=collator,
                     num_workers=int(data_cfg.get("num_workers", 1)),
                     prefetch_factor=int(data_cfg.get("prefetch_factor", 2)),

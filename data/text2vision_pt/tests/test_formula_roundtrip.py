@@ -3,7 +3,7 @@
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "haina_html_render"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "preprocessing"))
 
 from document_parser import canonical_display, parse_inline_parts, parse_document
 

@@ -22,9 +22,8 @@ from typing import Any, Iterable
 
 # ── Reuse the existing document_parser ──
 SCRIPT_DIR = Path(__file__).resolve().parent
-HHTML_RENDER_DIR = SCRIPT_DIR.parent.parent / "haina_html_render"
-if str(HHTML_RENDER_DIR) not in sys.path:
-    sys.path.insert(0, str(HHTML_RENDER_DIR))
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 from document_parser import (  # noqa: E402
     block_target,

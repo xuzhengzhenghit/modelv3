@@ -57,11 +57,7 @@ class RenderResult:
 
 
 class HtmlOCRRenderer:
-    """Wraps the existing haina_html_render HtmlOCRRenderer with dynamic canvas support.
-
-    This is a bridge class — leverages the proven Chromium+KaTeX infrastructure
-    while adding dynamic canvas sizing, measurement, and augmentation.
-    """
+    """Wraps the local html_ocr_renderer with dynamic canvas support."""
 
     def __init__(self, browser_config: BrowserConfig):
         self._cfg = browser_config
@@ -69,7 +65,6 @@ class HtmlOCRRenderer:
         self._katex_css = ""
         self._katex_js = ""
 
-        # Resolve KaTeX paths
         if self._cfg.katex_dist:
             kd = Path(self._cfg.katex_dist)
             css_path = kd / "katex.min.css"
@@ -80,20 +75,12 @@ class HtmlOCRRenderer:
                 self._katex_js = f"file://{js_path}"
 
     def _get_renderer(self):
-        """Lazy-load the underlying renderer."""
         if self._renderer is not None:
             return self._renderer
 
-        import sys
-        from pathlib import Path
-
-        html_render_dir = Path(__file__).resolve().parent.parent.parent / "haina_html_render"
-        if str(html_render_dir) not in sys.path:
-            sys.path.insert(0, str(html_render_dir))
-
-        from html_ocr_renderer import BrowserConfig as OldBrowserConfig
-        from html_ocr_renderer import HtmlOCRRenderer as OldRenderer
-        from html_ocr_renderer import RenderConfig as OldRenderConfig
+        from .html_ocr_renderer import BrowserConfig as OldBrowserConfig
+        from .html_ocr_renderer import HtmlOCRRenderer as OldRenderer
+        from .html_ocr_renderer import RenderConfig as OldRenderConfig
 
         old_render_cfg = OldRenderConfig(output_mode="uint8")
         old_browser_cfg = OldBrowserConfig(

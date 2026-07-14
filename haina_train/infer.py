@@ -13,7 +13,7 @@ from hainaocr_nativepixel.hainaocr_nativepixel.processing import load_tokenizer_
 
 # CKPT = sys.argv[1] if len(sys.argv) > 1 else '/mnt/si001719bp3c/default/XJZ/modelv3/haina_train/outputs/cpt1_html_stage1/checkpoint-00001000/model.safetensors'
 CKPT = sys.argv[1] if len(sys.argv) > 1 else '/mnt/si001719bp3c/default/XJZ/modelv3/haina_train/outputs/cpt1_html_stage1/checkpoint-latest/model.safetensors'
-IMAGE = sys.argv[2] if len(sys.argv) > 2 else '/mnt/si001719bp3c/default/XJZ/modelv3/tmp/00_CC-MAIN-20251204191828-20251204221828-00044.warc_processed.jsonl.gz_12-p00000.png'
+IMAGE = sys.argv[2] if len(sys.argv) > 2 else '/mnt/si001719bp3c/default/XJZ/modelv3/tmp/preview/CC-MAIN-20251204191828-20251204221828-00044.warc_processed.jsonl.gz_12-p00000.png'
 LLM = '/mnt/si001719kd1w/default/xjz/model/qwen3_0_6b'
 PROJECT_ROOT = '/mnt/si001719bp3c/default/XJZ/modelv3/hainaocr_nativepixel'
 DEV = 'cuda'

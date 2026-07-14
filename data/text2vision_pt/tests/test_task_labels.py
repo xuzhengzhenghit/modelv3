@@ -72,5 +72,6 @@ def test_text_replay_labels():
     batch = collator([sample])
 
     labels = batch["labels"][0]
-    # No -100 in text_only mode (all tokens participate)
-    assert all(l != -100 for l in labels[: labels.tolist().index(collator.tokenizer.pad_token_id)] if collator.tokenizer.pad_token_id in labels)
+    # Text replay: no visual prefix, all non-pad tokens compute loss
+    non_pad = [l for l in labels.tolist() if l != collator.tokenizer.pad_token_id]
+    assert all(l != -100 for l in non_pad)

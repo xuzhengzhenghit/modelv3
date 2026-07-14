@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Render preview — use existing haina_html_render to generate and save preview images.
-
-Usage:
-  python qc/render_preview.py \
-    --manifest /mnt/.../tmp/train/train-00000.jsonl \
-    --out-dir /mnt/.../tmp/preview \
-    --num 8
-"""
+"""Render preview — generate and save sample images from JSONL manifest."""
 
 from __future__ import annotations
 
@@ -17,10 +10,10 @@ import time
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-HHTML_RENDER_DIR = SCRIPT_DIR.parent.parent / "haina_html_render"
-sys.path.insert(0, str(HHTML_RENDER_DIR))
+T2V_DIR = SCRIPT_DIR.parent
+sys.path.insert(0, str(T2V_DIR))
 
-from html_ocr_renderer import BrowserConfig, HtmlOCRRenderer, RenderConfig
+from rendering.html_ocr_renderer import BrowserConfig, HtmlOCRRenderer, RenderConfig, RenderUnit, NeedsSplit, TooWide
 
 
 BROWSER = "/root/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome"
@@ -47,7 +40,6 @@ def main():
     )
     print(f"  init: {time.perf_counter() - t0:.1f}s")
 
-    # Load records
     records = []
     with open(args.manifest, "r", encoding="utf-8") as f:
         for line in f:
@@ -55,7 +47,7 @@ def main():
             if not line:
                 continue
             rec = json.loads(line)
-            if rec.get("t"):  # compact format: {i, t, s, f}
+            if rec.get("t"):
                 records.append(rec)
             if len(records) >= args.num:
                 break
@@ -69,49 +61,53 @@ def main():
         subject = rec.get("s", "")
         flags = rec.get("f", 0)
 
-        # Build blocks from text — simple paragraph
-        blocks = [{"kind": "paragraph", "parts": [{"kind": "text", "text": text}]}]
+        blocks = [{"id": "b0", "kind": "paragraph", "parts": [{"kind": "text", "text": text}]}]
+        unit = RenderUnit(sample_id=sample_id, blocks=tuple(blocks), target_text=text)
 
-        # Render
         seed = hash(sample_id) & 0x7FFFFFFF
         try:
-            result = renderer.render(blocks, seed)
+            result = renderer.render_dynamic(unit, seed)
+        except NeedsSplit as exc:
+            print(f"[{idx+1:2d}] SPLIT {sample_id[:40]}: {exc}")
+            continue
+        except TooWide as exc:
+            print(f"[{idx+1:2d}] TOOWIDE {sample_id[:40]}: {exc}")
+            continue
         except Exception as exc:
-            print(f"[{idx+1:2d}] SKIP {sample_id[:40]}: {exc}")
+            print(f"[{idx+1:2d}] ERROR {sample_id[:40]}: {exc}")
             continue
 
         png_bytes = result.get("png_or_jpeg_bytes", b"")
-        if png_bytes is None:
+        if not png_bytes:
             print(f"[{idx+1:2d}] SKIP {sample_id[:40]}: no png data")
             continue
 
-        # Save PNG
         safe_id = sample_id.replace("/", "_").replace("\\", "_")
         png_path = out / f"{safe_id}.png"
         png_path.write_bytes(png_bytes)
-
-        # Save JSON metadata
-        pv = result.get("pixel_values")
-        shape = list(pv.shape) if pv is not None else "?"
 
         meta = {
             "sample_id": sample_id,
             "subject": subject,
             "flags": flags,
-            "target_text": result.get("target_text", "")[:300],
-            "image_shape": shape,
-            "visual_tokens": result.get("num_visual_tokens", "?"),
-            "render_meta": result.get("render_meta", {}),
+            "target_text": result["target_text"],
+            "paper_size": list(result["paper_size"]),
+            "content_size": list(result["content_size"]),
+            "visual_tokens": result["num_visual_tokens"],
+            "image_grid_thw": list(result["image_grid_thw"]),
+            "render_meta": result["render_meta"],
         }
         json_path = out / f"{safe_id}.json"
         json_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
 
-        # Summary line
         size_kb = len(png_bytes) / 1024
-        nt = result.get("num_visual_tokens", "?")
+        nt = result["num_visual_tokens"]
+        pw, ph = result["paper_size"]
+        cw, ch = result["content_size"]
+        oh = "O" if result["render_meta"].get("overflow") else ""
         print(f"[{idx+1:2d}] {sample_id[:50]:<52s} "
-              f"{shape[2] if isinstance(shape, list) else '?'}×{shape[1] if isinstance(shape, list) and len(shape)>1 else '?'}  "
-              f"{nt} tokens  {size_kb:.0f}KB")
+              f"paper={pw}×{ph:<4} content={ch}px  "
+              f"{nt} tokens  {size_kb:.0f}KB {oh}")
 
         results.append(meta)
 
