@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""RenderDataset — clean IterableDataset using the real render_dynamic().
+"""RenderDataset — multi-task IterableDataset with online HTML rendering.
 
-Drop-in replacement for HtmlRenderedOCRDataset from haina_html_render.
+Supports: Full OCR (A), Optical Continuation (B), Text Replay (D).
 Each DataLoader worker maintains a persistent Chromium + KaTeX instance.
 """
 
@@ -25,33 +25,33 @@ from rendering.html_ocr_renderer import (
     BrowserConfig, HtmlOCRRenderer, RenderConfig,
     RenderUnit, NeedsSplit, TooWide,
 )
+from tasks.task_sampler import TaskSampler, TaskType
 
 logger = logging.getLogger(__name__)
 
-# ── Text-to-blocks parser (uses document_parser from preprocessing/) ──
+# ── Default task weights (A: Full OCR, B: Optical Continuation, D: Text Replay) ──
+DEFAULT_TASK_WEIGHTS = {
+    "full_ocr": 0.60,
+    "optical_continuation": 0.25,
+    "text_replay": 0.15,
+}
+
+# ── Text-to-blocks parser ──
 def _parse_text_to_blocks(text: str, subject: str | None = None) -> list[dict[str, Any]]:
-    """Parse compact JSONL 't' field into structured blocks with math/table support."""
     try:
         from preprocessing.document_parser import parse_document
         blocks = parse_document(text, subject, max_block_chars=420)
-        # Assign IDs to blocks
         for i, b in enumerate(blocks):
             b["id"] = f"b{i}"
         return blocks
     except Exception:
-        # Fallback: single paragraph
         return [{"id": "b0", "kind": "paragraph", "parts": [{"kind": "text", "text": text}]}]
 
 
 class RenderDataset(IterableDataset):
-    """Streams JSONL records → renders online → yields (pixel_values, metadata).
+    """Streams JSONL records → task-sampled → renders online → yields samples.
 
-    Compatible with train_haina_cpt.py training loop — just swap the import.
-
-    Usage:
-        renderer = HtmlOCRRenderer(RenderConfig(...), BrowserConfig(...))
-        dataset = RenderDataset(manifest_files, renderer, base_seed=42, rank=0)
-        loader = DataLoader(dataset, batch_size=4, collate_fn=collator, ...)
+    Compatible with train_haina_cpt.py training loop.
     """
 
     def __init__(
@@ -64,9 +64,10 @@ class RenderDataset(IterableDataset):
         rank: int = 0,
         world_size: int = 1,
         max_samples: int = 0,
+        task_weights: dict[str, float] | None = None,
     ):
         self._files = manifest_files
-        self._renderer = renderer      # shared renderer (will be cloned per worker)
+        self._renderer = renderer
         self._render_config = render_config
         self._browser_config = browser_config
         self._base_seed = base_seed
@@ -74,18 +75,17 @@ class RenderDataset(IterableDataset):
         self._world_size = world_size
         self._max_samples = max_samples
         self._epoch = 0
+        self._task_sampler = TaskSampler(weights=task_weights or DEFAULT_TASK_WEIGHTS)
 
     def set_epoch(self, epoch: int):
         self._epoch = epoch
 
     def _get_renderer(self) -> HtmlOCRRenderer:
-        """Create or reuse a per-worker renderer."""
         worker = get_worker_info()
         wid = worker.id if worker else 0
         cache_attr = f"_renderer_w{wid}"
         if hasattr(self, cache_attr):
             return getattr(self, cache_attr)
-
         if self._renderer is not None:
             r = self._renderer
         else:
@@ -99,7 +99,6 @@ class RenderDataset(IterableDataset):
     def __iter__(self) -> Iterator[dict[str, Any]]:
         worker = get_worker_info()
         wid = worker.id if worker else 0
-        nw = worker.num_workers if worker else 1
 
         files = list(self._files)
         rng = random.Random(self._base_seed + self._epoch * 1000 + wid)
@@ -128,31 +127,52 @@ class RenderDataset(IterableDataset):
                     if not text or not sid:
                         continue
 
-                    # Parse text into structured blocks (paragraph/math/table)
+                    # ── Task sampling ──
+                    task = self._task_sampler.sample_task(rec, self._epoch, self._base_seed)
+                    is_text_only = task.is_text_only or task.task_type == TaskType.TEXT_REPLAY
+
+                    # ── Text Replay: no rendering ──
+                    if is_text_only:
+                        yield {
+                            "sample_id": sid,
+                            "target_text": task.target_text,
+                            "is_text_only": True,
+                        }
+                        count += 1
+                        if self._max_samples > 0 and count >= self._max_samples:
+                            return
+                        continue
+
+                    # ── Parse visual_text into blocks for rendering ──
                     subject = rec.get("s", rec.get("subject"))
-                    blocks = _parse_text_to_blocks(text, subject)
+                    blocks = _parse_text_to_blocks(task.visual_text, subject)
                     if not blocks:
                         continue
 
-                    unit = RenderUnit(sample_id=sid, blocks=tuple(blocks), target_text=text)
+                    unit = RenderUnit(
+                        sample_id=sid,
+                        blocks=tuple(blocks),
+                        target_text=task.target_text,
+                        task_type=task.task_type.value,
+                    )
 
                     seed = hash(sid) & 0x7FFFFFFF
                     try:
                         result = renderer.render_dynamic(unit, seed)
-                    except NeedsSplit:
-                        continue  # skip — upstream paginator would split
-                    except TooWide:
+                    except (NeedsSplit, TooWide):
                         continue
                     except Exception:
                         continue
 
                     yield {
                         "sample_id": sid,
-                        "pixel_values": result["pixel_values"],  # torch.uint8 [3, H, W]
-                        "target_text": result["target_text"],
+                        "pixel_values": result["pixel_values"],
+                        "target_text": task.target_text,
+                        "prefix_text": task.prefix_text,
                         "num_visual_tokens": result["num_visual_tokens"],
                         "image_grid_thw": result["image_grid_thw"],
                         "paper_size": result["paper_size"],
+                        "task_type": task.task_type.value,
                     }
 
                     count += 1
@@ -164,4 +184,4 @@ class RenderDataset(IterableDataset):
     def __len__(self) -> int:
         if self._max_samples > 0:
             return self._max_samples
-        return len(self._files) * 50000   # rough estimate
+        return len(self._files) * 50000

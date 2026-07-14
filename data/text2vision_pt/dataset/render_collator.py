@@ -1,8 +1,17 @@
 #!/usr/bin/env python3
-"""RenderCollator — assembles rendered samples into training batches.
+"""RenderCollator — assembles multi-task rendered samples into training batches.
 
-Compatible with train_haina_cpt.py — same output format as HainaCPTCollator.
-Supports image samples (full OCR) and text-only samples (text mixing).
+Task A (Full OCR):
+    <vision_start> <image_pad>×N <vision_end> target_text <eos>
+    labels: vision prefix = -100, target = loss
+
+Task B (Optical Continuation):
+    prefix_text <vision_start> <image_pad>×N <vision_end> suffix_text <eos>
+    labels: prefix + vision prefix = -100, suffix = loss
+
+Task D (Text Replay):
+    target_text <eos>
+    labels: all tokens = loss
 """
 
 from __future__ import annotations
@@ -13,16 +22,7 @@ import torch
 
 
 class RenderCollator:
-    """Collates RenderDataset outputs into model inputs.
-
-    Image sample:
-        <vision_start> <image_pad>×N <vision_end> target_text <eos>
-        labels: vision prefix = -100, target = loss
-
-    Text-only sample:
-        target_text <eos>
-        labels: all tokens = loss
-    """
+    """Collates RenderDataset outputs into model inputs."""
 
     def __init__(
         self,
@@ -47,12 +47,15 @@ class RenderCollator:
         batch_pixel_values, batch_grid_thw = [], []
 
         for s in samples:
+            task = s.get("task_type", "full_ocr")
+
             if s.get("is_text_only"):
                 ids, labs = self._build_text_only(s)
+            elif task == "optical_continuation":
+                ids, labs = self._build_optical_continuation(s)
             else:
-                ids, labs = self._build_image(s)
+                ids, labs = self._build_full_ocr(s)
 
-            # Truncate if needed
             if len(ids) > self.max_length:
                 ids = ids[:self.max_length]
                 labs = labs[:self.max_length]
@@ -65,11 +68,8 @@ class RenderCollator:
                 _, gh, gw = s["image_grid_thw"]
                 batch_grid_thw.append([1, gh, gw])
 
-        # Pad
         max_len = max(len(seq) for seq in batch_input_ids)
-        input_ids = []
-        labels = []
-        attention_mask = []
+        input_ids, labels, attention_mask = [], [], []
         for ids, labs in zip(batch_input_ids, batch_labels):
             pad_len = max_len - len(ids)
             input_ids.append(ids + [self.pad_id] * pad_len)
@@ -88,23 +88,38 @@ class RenderCollator:
 
         return out
 
-    def _build_image(self, s):
+    def _build_full_ocr(self, s: dict) -> tuple[list[int], list[int]]:
+        # Task A: image → full text
         nt = s.get("num_visual_tokens", 512)
-        prefix = [self.vision_start_id] + [self.image_pad_id] * nt + [self.vision_end_id]
-        target_ids = self.tokenizer.encode(s["target_text"], add_special_tokens=False)
-        input_ids = prefix + target_ids + [self.eos_id]
-        labels = [-100] * len(prefix) + target_ids + [self.eos_id]
-        return input_ids, labels
+        vis_prefix = [self.vision_start_id] + [self.image_pad_id] * nt + [self.vision_end_id]
+        tids = self.tokenizer.encode(s["target_text"], add_special_tokens=False)
+        ids = vis_prefix + tids + [self.eos_id]
+        labs = [-100] * len(vis_prefix) + tids + [self.eos_id]
+        return ids, labs
 
-    def _build_text_only(self, s):
-        target_ids = self.tokenizer.encode(s["target_text"], add_special_tokens=False)
-        input_ids = target_ids + [self.eos_id]
-        labels = target_ids + [self.eos_id]
-        return input_ids, labels
+    def _build_optical_continuation(self, s: dict) -> tuple[list[int], list[int]]:
+        # Task B: prefix + image → predict suffix
+        nt = s.get("num_visual_tokens", 512)
+        vis_prefix = [self.vision_start_id] + [self.image_pad_id] * nt + [self.vision_end_id]
+
+        prefix_text = s.get("prefix_text", "")
+        prefix_ids = self.tokenizer.encode(prefix_text, add_special_tokens=False) if prefix_text else []
+
+        suffix_ids = self.tokenizer.encode(s["target_text"], add_special_tokens=False)
+
+        ids = prefix_ids + vis_prefix + suffix_ids + [self.eos_id]
+        labs = [-100] * (len(prefix_ids) + len(vis_prefix)) + suffix_ids + [self.eos_id]
+        return ids, labs
+
+    def _build_text_only(self, s: dict) -> tuple[list[int], list[int]]:
+        # Task D: pure text
+        tids = self.tokenizer.encode(s["target_text"], add_special_tokens=False)
+        ids = tids + [self.eos_id]
+        labs = tids + [self.eos_id]
+        return ids, labs
 
 
 def _stack_images(images: list[torch.Tensor]) -> torch.Tensor:
-    """Stack images of potentially different sizes by padding to max H,W."""
     max_h = max(img.shape[1] for img in images)
     max_w = max(img.shape[2] for img in images)
     c = images[0].shape[0]
