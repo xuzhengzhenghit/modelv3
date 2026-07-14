@@ -27,9 +27,9 @@ class RenderCollator:
     def __init__(
         self,
         tokenizer,
-        vision_start_id: int = 151652,
-        image_pad_id: int = 151655,
-        vision_end_id: int = 151653,
+        vision_start_id: int = 5,
+        image_pad_id: int = 7,
+        vision_end_id: int = 6,
         eos_id: int | None = None,
         pad_id: int | None = None,
         max_length: int = 4096,

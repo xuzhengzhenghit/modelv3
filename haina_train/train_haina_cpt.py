@@ -65,9 +65,10 @@ except Exception:
     HtmlOCRRenderer = None
 
 
-VISION_START = 151652
-VISION_END = 151653
-IMAGE_PAD = 151655
+# OCR vocab IDs: <|vision_start|>=5, <|vision_end|>=6, <|image_pad|>=7
+VISION_START = 5
+VISION_END = 6
+IMAGE_PAD = 7
 
 
 DEFAULT_CONFIG: Dict[str, Any] = {
@@ -698,10 +699,20 @@ def train(cfg: Dict[str, Any]) -> None:
             yaml.safe_dump(cfg, f, allow_unicode=True, sort_keys=False)
 
     logger.info("rank=%d/%d local_rank=%d device=%s", rank, world_size, local_rank, device)
-    llm_path = cfg["model"].get("llm_path", "")
-    if not llm_path or not Path(llm_path).exists():
-        llm_path = "/mnt/si001719kd1w/default/xjz/model/qwen3_0_6b"
-    tokenizer = load_tokenizer_with_fixes(llm_path, trust_remote_code=True)
+    # ── OCR character-level tokenizer (18900 tokens) ──
+    tokenizer_dir = cfg["data"].get("tokenizer_dir", "")
+    if not tokenizer_dir:
+        tokenizer_dir = str(PROJECT_ROOT / "data" / "ocr_vocab" / "tokenizer")
+    if Path(tokenizer_dir).exists():
+        from hainaocr_nativepixel.hainaocr_nativepixel.ocr_tokenizer import OCRTokenizer
+        tokenizer = OCRTokenizer.from_pretrained(tokenizer_dir)
+        logger.info("Using OCR tokenizer from %s (vocab_size=%d)", tokenizer_dir, tokenizer.vocab_size)
+    else:
+        llm_path = cfg["model"].get("llm_path", "")
+        if not llm_path or not Path(llm_path).exists():
+            llm_path = "/mnt/si001719kd1w/default/xjz/model/qwen3_0_6b"
+        tokenizer = load_tokenizer_with_fixes(llm_path, trust_remote_code=True)
+        logger.info("Using Qwen3 tokenizer from %s", llm_path)
     tokenizer.pad_token = tokenizer.eos_token
     image_processor = HainaOCRNativePixelImageProcessor.from_pretrained(cfg["model"]["model_dir"])
     image_processor.cpu_patchify = bool(cfg["data"].get("cpu_patchify", False))
@@ -773,6 +784,7 @@ def train(cfg: Dict[str, Any]) -> None:
                     manifest_files, renderer=renderer,
                     base_seed=int(cfg["training"]["seed"]),
                     rank=rank,
+                    world_size=world_size,
                 )
                 collator = RenderCollator(
                     tokenizer=tokenizer,
