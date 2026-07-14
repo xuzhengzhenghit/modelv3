@@ -456,8 +456,24 @@ class HainaOCRNativePixelForConditionalGeneration(HainaOCRNativePixelPreTrainedM
             trust_remote_code=True,
         )
         qwen3_state = self._select_qwen3_layers_state_dict(llm.model.state_dict())
-        self.model.qwen3.load_state_dict(qwen3_state, strict=True)
-        self.lm_head.load_state_dict(llm.lm_head.state_dict(), strict=True)
+        # Handle vocab size mismatch: skip embed_tokens and lm_head if sizes differ
+        src_embed = qwen3_state.get("embed_tokens.weight")
+        dst_embed = self.model.qwen3.embed_tokens.weight
+        if src_embed is not None and src_embed.shape != dst_embed.shape:
+            print(f"  - embed_tokens mismatch: src={src_embed.shape} dst={dst_embed.shape}, skipping")
+            del qwen3_state["embed_tokens.weight"]
+        self.model.qwen3.load_state_dict(qwen3_state, strict=False)
+
+        src_lm = llm.lm_head.state_dict()
+        dst_lm = self.lm_head.state_dict()
+        lm_skip = []
+        for k in list(src_lm.keys()):
+            if k in dst_lm and src_lm[k].shape != dst_lm[k].shape:
+                print(f"  - lm_head.{k} mismatch: src={src_lm[k].shape} dst={dst_lm[k].shape}, skipping")
+                lm_skip.append(k)
+        for k in lm_skip:
+            del src_lm[k]
+        self.lm_head.load_state_dict(src_lm, strict=False)
         del llm
         if dtype is not None:
             self.to(dtype=dtype)
