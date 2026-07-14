@@ -31,16 +31,25 @@
 | 单样本延迟 | ~260ms | ~280ms |
 | GPU 显存 | 11 GB (固定 512 tokens) | 7.7 GB (动态 bucket) |
 
+### 多任务支持（2026-07-14）
+
+`RenderDataset` 接入 `TaskSampler`，`RenderCollator` 支持三种任务格式：
+
+| 任务 | 占比 | 序列格式 | labels |
+|------|------|---------|--------|
+| **A: Full OCR** | 60% | `<vision_start><image_pad>×N<vision_end>target<eos>` | vision=-100, target=loss |
+| **B: Optical Continuation** | 25% | `prefix<vision_start><image_pad>×N<vision_end>suffix<eos>` | prefix+vision=-100, suffix=loss |
+| **D: Text Replay** | 15% | `target<eos>` | 全部=loss |
+
+数据源不变（onesci_cc_pages JSONL），TaskSampler 在线拆分文本，无需额外预处理。
+
 ## 验证结果
 
-Smoke test: 50 samples, 3 epochs, 150 steps.
-
-| 指标 | 值 |
-|------|-----|
-| loss | 4.05 → 0.50 |
-| throughput | ~6.2 samples/s, ~3700 tokens/s |
-| GPU | 7.69 GB |
-| 状态 | PASSED |
+| 阶段 | loss | samples/s | GPU |
+|------|------|-----------|-----|
+| 单任务 smoke test | 4.05 → 0.50 | ~6.2 | 7.69 GB |
+| 多任务 smoke test | ~4 → 0.53 | ~5.6 | 7.69 GB |
+| 状态 | PASSED | PASSED | - |
 
 ## 运行命令（不变）
 
