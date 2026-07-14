@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+benchmark_output/
+full_preview/
+*.offsets.npy
+*.offsets.meta.json
+*.offsets.lock

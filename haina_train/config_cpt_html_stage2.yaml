@@ -1,0 +1,89 @@
+# Stage 2 CPT: resume from Stage 1 weights + add pure text mixing
+# Launch from /mnt/si001719bp3c/default/XJZ/modelv3/haina_train
+#
+# Stage 1: trained vision encoder + Qwen3 on HTML-rendered image-text pairs
+# Stage 2: resume all weights + add 20% pure text to prevent forgetting
+
+model:
+  model_dir: /mnt/si001719bp3c/default/XJZ/modelv3/hainaocr_nativepixel
+  llm_path: ""                                 # not used: weights come from base_checkpoint
+  cnn_weights: ""                              # not used: weights come from base_checkpoint
+  base_checkpoint: /mnt/si001719bp3c/default/XJZ/modelv3/haina_train/outputs/cpt1_html_stage1/checkpoint-latest/model.safetensors
+  attn_implementation: flash_attention_2
+  torch_dtype: bfloat16
+  use_liger_ce: false
+  gradient_checkpointing: false
+  compile: false
+
+  # ── Full training ──
+  train_vision_encoder: true
+  train_pos_embed: true
+  train_vision_boundary: true
+  train_qwen3: true
+  train_lm_head: true
+
+data:
+  # HTML online render pipeline
+  html_manifest_glob: "/mnt/si001719kd1w/default/xjz/data/onesci_cc_pages/pages-*.jsonl"
+  browser_path: "/mnt/si001719bp3c/default/XJZ/modelv3/.cache/playwright/chromium-1228/chrome-linux64/chrome"
+  katex_dist: "/mnt/si001719bp3c/default/XJZ/modelv3/data/haina_html_render/node_modules/katex/dist"
+
+  max_length: 4096
+  samples_per_epoch: 9733672
+  shuffle_files: true
+
+  # ── Pure text mixing ──
+  text_jsonl_path: "/mnt/si001719kd1w/default/xjz/data/onesci_cc_pages/pages-00001.jsonl"
+  text_ratio: 0.2
+
+  num_workers: 2
+  prefetch_factor: 2
+  pin_memory: true
+  persistent_workers: true
+
+training:
+  seed: 42
+  epochs: 1
+  micro_batch_size: 2
+  grad_accum_steps: 16
+
+  lr: 5.0e-5                               # lower LR for continued training
+  min_lr: 0.0
+  weight_decay: 0.1
+  betas: [0.9, 0.95]
+  eps: 1.0e-8
+  max_grad_norm: 1.0
+
+  warmup_ratio: 0.01
+  warmup_steps: 0
+  lr_schedule: cosine
+  precision: bf16
+
+  log_interval: 10
+  save_interval: 500
+  save_each_epoch: true
+  keep_last_n: 5
+  resume: false                              # fresh start, weights from base_checkpoint
+  save_final: true
+
+  detect_anomaly: false
+  empty_cache_interval: 0
+  throughput_window: 50
+
+ddp:
+  find_unused_parameters: true
+  static_graph: false
+  gradient_as_bucket_view: false
+  broadcast_buffers: false
+
+profile:
+  enabled: false
+  start_step: 10
+  num_steps: 20
+  record_shapes: false
+  with_stack: false
+  export_chrome_trace: true
+
+output:
+  output_dir: /mnt/si001719bp3c/default/XJZ/modelv3/haina_train/outputs/cpt2_html_stage2
+  log_dir: /mnt/si001719bp3c/default/XJZ/modelv3/haina_train/outputs/cpt2_html_stage2/tb

@@ -1,0 +1,85 @@
+# HainaOCR NativePixel CPT training config.
+# Launch from /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/haina_train
+
+model:
+  model_dir: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel
+  llm_path: /mnt/si001719kd1w/default/xjz/model/qwen3_0_6b
+  cnn_weights: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/neo_distill_final/weights/cnn_neo_distill_10k.safetensors.best
+  attn_implementation: flash_attention_2
+  torch_dtype: bfloat16
+  use_liger_ce: false
+  gradient_checkpointing: false
+  compile: false
+
+
+  train_vision_encoder: true
+  train_pos_embed: true
+  train_vision_boundary: true
+  train_qwen3: false
+  train_lm_head: false
+
+data:
+  jsonl_glob: /mnt/si001719kd1w/default/xjz/data/swift_jsonl/train_shuffled.jsonl
+  max_length: 4096
+
+  # Set this to the real number of samples for exact epoch length.
+  # If 0, the trainer uses the old project estimate 1051594.
+  samples_per_epoch: 0
+
+  shuffle_files: true
+  skip_bad_samples: true
+  image_open_retries: 1
+  cpu_patchify: false
+
+  # These matter for GPU utilization. Increase if logs show low samples/s and CPU idle is low.
+  num_workers: 4
+  prefetch_factor: 4
+  pin_memory: true
+  persistent_workers: true
+
+training:
+  seed: 42
+  epochs: 1
+  micro_batch_size: 2
+  grad_accum_steps: 16
+
+  lr: 1.0e-3
+  min_lr: 0.0
+  weight_decay: 0.1
+  betas: [0.9, 0.95]
+  eps: 1.0e-8
+  max_grad_norm: 1.0
+
+  warmup_ratio: 0.01
+  warmup_steps: 0
+  lr_schedule: cosine
+  precision: bf16
+
+  log_interval: 10
+  save_interval: 500
+  save_each_epoch: true
+  keep_last_n: 5
+  resume: auto
+  save_final: true
+
+  detect_anomaly: false
+  empty_cache_interval: 0
+  throughput_window: 50
+
+ddp:
+  find_unused_parameters: true
+  static_graph: false
+  gradient_as_bucket_view: false
+  broadcast_buffers: false
+
+profile:
+  enabled: false
+  start_step: 10
+  num_steps: 20
+  record_shapes: false
+  with_stack: false
+  export_chrome_trace: true
+
+output:
+  output_dir: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/haina_train/outputs/cpt_v1
+  log_dir: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/haina_train/outputs/cpt_v1/tb

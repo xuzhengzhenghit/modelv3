@@ -1,0 +1,91 @@
+# ── Rendering configuration ──
+
+browser:
+  executable: "/root/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome"
+  katex_dist: "/mnt/si001719bp3c/default/XJZ/modelv3/data/haina_html_render/node_modules/katex/dist"
+  viewport_pool_size: 2
+  page_pool_per_viewport: 2
+  timeout_ms: 5000
+  block_external_urls: true
+  block_images: true
+
+canvas:
+  min_width: 256
+  max_width: 1024
+  min_height: 64
+  max_height: 512
+  step: 32                      # must be divisible by effective_patch_size
+  extra_slack_patches: [0, 0, 1, 2]  # random extra width/height in patch units
+
+margins:
+  top: [16, 64]
+  bottom: [16, 64]
+  left: [16, 64]
+  right: [16, 64]
+
+typography:
+  font_size: [18, 34]
+  line_height: [1.2, 1.8]
+  letter_spacing: [0.0, 0.03]
+  text_align: ["justify", "left"]
+
+fonts:
+  serif: ["Times New Roman", "Georgia", "Noto Serif"]
+  sans_serif: ["Arial", "Helvetica", "Noto Sans"]
+  monospace: ["Courier New", "Consolas", "Noto Sans Mono"]
+  math: ["KaTeX_Main", "KaTeX_Math"]
+  cjk: ["Noto Sans SC", "Noto Serif SC"]
+  weights: [0.35, 0.35, 0.15, 0.10, 0.05]  # serif, sans, mono, cjk, math
+
+page_layouts:
+  scientific_paper:
+    weight: 0.30
+    margin_mult: 1.3
+    max_width: 800
+    font_preference: serif
+  textbook:
+    weight: 0.20
+    margin_mult: 1.2
+    max_width: 750
+    font_preference: serif
+  news_web:
+    weight: 0.15
+    margin_mult: 0.8
+    max_width: 700
+    font_preference: sans_serif
+  blog:
+    weight: 0.10
+    margin_mult: 1.0
+    max_width: 720
+    font_preference: sans_serif
+  documentation:
+    weight: 0.10
+    margin_mult: 1.1
+    max_width: 900
+    font_preference: monospace
+  terminal:
+    weight: 0.05
+    margin_mult: 0.6
+    max_width: 640
+    font_preference: monospace
+  report:
+    weight: 0.05
+    margin_mult: 1.4
+    max_width: 780
+    font_preference: serif
+  dense_text:
+    weight: 0.05
+    margin_mult: 0.5
+    max_width: 960
+    font_preference: serif
+
+degradation:
+  clean: 0.80
+  mild: 0.18
+  hard: 0.02
+  # Specific degradation parameters defined in image_augment.py
+
+tensor:
+  output_mode: "uint8"         # uint8 or float32
+  image_mean: [0.5, 0.5, 0.5]
+  image_std: [0.5, 0.5, 0.5]

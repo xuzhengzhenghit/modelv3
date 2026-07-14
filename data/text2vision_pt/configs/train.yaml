@@ -1,0 +1,47 @@
+# ── Training configuration (for integration with train_haina_cpt.py) ──
+
+sequence:
+  max_length: 4096
+  vision_start_id: 151652
+  vision_end_id: 151653
+  image_pad_id: 151655
+
+batch:
+  micro_batch_size: 2
+  grad_accum_steps: 16
+  num_workers: 2
+  prefetch_factor: 2
+  persistent_workers: true
+  pin_memory: true
+  bucket_by_shape: true
+
+curriculum:
+  enabled: true
+  phase1:
+    steps: 50000
+    clean: 0.80
+    mild: 0.18
+    hard: 0.02
+  phase2:
+    steps: 100000
+    clean: 0.55
+    mild: 0.35
+    hard: 0.10
+  phase3:
+    steps: null            # until end
+    clean: 0.40
+    mild: 0.40
+    hard: 0.20
+
+validation:
+  fixed_samples: 200
+  fixed_seed: 42
+  fixed_style: "scientific_paper"
+  font_size: 26
+  degradation: "clean"
+  eval_interval_steps: 1000
+
+visual_dependency:
+  enabled: true
+  compare_modes: ["correct", "wrong", "blank", "noise"]
+  eval_interval_steps: 2000

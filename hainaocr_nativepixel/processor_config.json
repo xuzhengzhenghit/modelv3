@@ -1,0 +1,6 @@
+{
+  "image_processor_type": "HainaOCRNativePixelImageProcessor",
+  "processor_class": "HainaOCRNativePixelProcessor",
+  "tokenizer_class": "AutoTokenizer"
+}
+

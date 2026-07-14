@@ -1,0 +1,98 @@
+# HainaOCR NativePixel SFT training config.
+# Launch from /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/haina_train
+#
+# 与 CPT 的关键差异:
+#   1. ChatML 格式: <|im_start|>user/assistant + vision tokens
+#   2. labels 仅 on assistant 消息
+#   3. 图文 (VQA) + 纯文本 (PEFT) 混合训练
+#   4. 基础权重从 CPT checkpoint 加载
+#   5. LR 更低 (2e-5 vs 1e-4)
+
+model:
+  model_dir: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel
+  llm_path: /mnt/si001719kd1w/default/xjz/model/qwen3_0_6b
+
+  # ★ CPT 基础权重 — 从此 checkpoint 加载后开始 SFT
+  base_checkpoint: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/haina_train/outputs/cpt8_81/checkpoint-00010000/model.safetensors
+
+  attn_implementation: flash_attention_2
+  torch_dtype: bfloat16
+  use_liger_ce: false
+  gradient_checkpointing: true
+  compile: false
+
+  # SFT 全参数训练
+  train_vision_encoder: true
+  train_pos_embed: true
+  train_qwen3: true
+  train_lm_head: true
+
+data:
+  # VQA 多轮图文数据
+  image_jsonl_glob: /mnt/si001719kd1w/default/gyw/DataSet/Step0_Train/VQA/Train.jsonl
+
+  # PEFT 纯文本数据
+  text_jsonl_glob: /mnt/si001719kd1w/default/gyw/DataSet/Step0_Train/PEFT/Train.jsonl
+
+  max_length: 4096
+  shuffle_files: true
+  skip_bad_samples: true
+  image_open_retries: 2
+  cpu_patchify: false
+
+  # 纯文本样本比例 (0~1)
+  # 0.3 = 70% VQA图文 + 30% 纯文本PEFT
+  text_ratio: 0.3
+
+  num_workers: 4
+  prefetch_factor: 4
+  pin_memory: true
+  persistent_workers: true
+
+training:
+  seed: 42
+  epochs: 2
+  micro_batch_size: 2
+  grad_accum_steps: 16
+
+  # SFT 用更低的学习率
+  lr: 5.0e-5
+  min_lr: 0.0
+  weight_decay: 0.1
+  betas: [0.9, 0.95]
+  eps: 1.0e-8
+  max_grad_norm: 1.0
+
+  warmup_ratio: 0.03
+  warmup_steps: 0
+  lr_schedule: cosine
+  precision: bf16
+
+  log_interval: 10
+  save_interval: 500
+  save_each_epoch: true
+  keep_last_n: 3
+  resume: auto
+  save_final: true
+
+  detect_anomaly: false
+  empty_cache_interval: 0
+  throughput_window: 50
+
+ddp:
+  find_unused_parameters: true
+  static_graph: false
+  gradient_as_bucket_view: true
+  broadcast_buffers: false
+
+profile:
+  enabled: false
+  start_step: 10
+  num_steps: 20
+  record_shapes: false
+  with_stack: false
+  export_chrome_trace: true
+
+output:
+  output_dir: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/haina_train/outputs/sft_v1
+  log_dir: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/haina_train/outputs/sft_v1/tb

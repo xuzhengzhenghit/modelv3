@@ -1,0 +1,46 @@
+# Model weights & checkpoints
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.h5
+outputs/
+checkpoint-*/
+
+# Images & data
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.tif
+*.jsonl
+*.jsonl.gz
+preview/
+full_preview/
+benchmark_output/
+tmp/
+
+# Cache & dependencies
+__pycache__/
+*.pyc
+.cache/
+node_modules/
+package-lock.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Large data
+data/*.jsonl
+data/*.gz
+data/images/
+
+# Logs
+*.log
+logs/

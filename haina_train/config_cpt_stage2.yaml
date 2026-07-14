@@ -1,0 +1,91 @@
+# CPT Stage 2: text-only data mixing + Qwen3 last 4 layers unfrozen.
+# Launch from /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/haina_train
+#
+# Stage 1 (cpt_v1): trained vision frontend with pretrained Qwen3, Qwen3 fully frozen
+# Stage 2 (this):  add text-only data, unfreeze Qwen3 layers[0-7] + embed_tokens + final_norm
+#                  so the LLM learns to process visual tokens
+
+model:
+  model_dir: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel
+  llm_path: /mnt/si001719kd1w/default/xjz/model/qwen3_0_6b
+  cnn_weights: ""
+  base_checkpoint: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/haina_train/outputs/cpt_stage2/checkpoint-00004000/model.safetensors
+  attn_implementation: flash_attention_2
+  torch_dtype: bfloat16
+  use_liger_ce: false
+  gradient_checkpointing: false
+  compile: false
+
+  # ── Stage 2: vision frontend continues training ──
+  train_vision_encoder: true
+  train_pos_embed: true
+  train_vision_boundary: true
+
+  # ── Qwen3 layer-wise control ──
+  # train_qwen3: false + train_qwen3_layers = only those specific layers
+  train_qwen3: true
+  # train_qwen3_layers: [0, 1, 2, 3, 4, 5, 6, 7]     # unfreeze first 8 layers (visual feature processing)
+  train_qwen3_embed_tokens: true          # let vision token embeddings adapt
+  train_qwen3_final_norm: true            # allow final RMSNorm to adapt
+  train_lm_head: true                    # keep output head frozen
+
+data:
+  jsonl_glob: /mnt/si001719kd1w/default/xjz/data/swift_jsonl/train_shuffled.jsonl
+  text_jsonl_path: /mnt/si001719kd1w/default/xjz/data/cpt_text_data/onesci_cc_150k.jsonl
+  text_ratio: 0.2                          # 20% text-only samples
+  max_length: 4096
+  samples_per_epoch: 0
+  shuffle_files: true
+  skip_bad_samples: true
+  image_open_retries: 1
+  cpu_patchify: false
+  num_workers: 4
+  prefetch_factor: 4
+  pin_memory: true
+  persistent_workers: true
+
+training:
+  seed: 42
+  epochs: 1
+  micro_batch_size: 2
+  grad_accum_steps: 16
+
+  lr: 5.0e-5                               # Stage 2: higher LR for LLM adaptation
+  min_lr: 0.0
+  weight_decay: 0.1
+  betas: [0.9, 0.95]
+  eps: 1.0e-8
+  max_grad_norm: 1.0
+
+  warmup_steps: 50                         # fast warmup, reach peak LR quickly
+  lr_schedule: cosine
+  precision: bf16
+
+  log_interval: 10
+  save_interval: 500
+  save_each_epoch: true
+  keep_last_n: 5
+  resume: false
+  save_final: true
+
+  detect_anomaly: false
+  empty_cache_interval: 0
+  throughput_window: 50
+
+ddp:
+  find_unused_parameters: true             # needed when some layers are frozen
+  static_graph: false
+  gradient_as_bucket_view: false
+  broadcast_buffers: false
+
+profile:
+  enabled: false
+  start_step: 10
+  num_steps: 20
+  record_shapes: false
+  with_stack: false
+  export_chrome_trace: true
+
+output:
+  output_dir: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/haina_train/outputs/cpt_stage3
+  log_dir: /mnt/si001719bp3c/default/XJZ/hainaocr_nativepixel/haina_train/outputs/cpt_stage3/tb

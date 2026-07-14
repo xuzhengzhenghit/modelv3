@@ -1,0 +1,49 @@
+# ── Task configuration ──
+
+tasks:
+  full_ocr:
+    weight: 0.60
+    enabled: true
+    description: "Full page OCR — image → full text"
+
+  optical_continuation:
+    weight: 0.10
+    enabled: true
+    description: "Prefix + image + suffix → predict suffix"
+    span:
+      min_tokens: 16
+      max_tokens: 256
+      distribution: "log_uniform"  # log_uniform or uniform
+      prefer: ["formula", "entity", "numeric", "definition"]
+      boundary: ["sentence", "paragraph", "formula", "table"]
+
+  span_reconstruction:
+    weight: 0.20
+    enabled: true
+    description: "Text + image → reconstruct visual span"
+    span:
+      min_tokens: 16
+      max_tokens: 256
+      distribution: "log_uniform"
+
+  text_replay:
+    weight: 0.10
+    enabled: true
+    description: "Pure text continuation — prevent language forgetting"
+
+stages:
+  stage1:
+    full_ocr: 0.60
+    optical_continuation: 0.10
+    span_reconstruction: 0.20
+    text_replay: 0.10
+  stage2:
+    full_ocr: 0.40
+    optical_continuation: 0.35
+    span_reconstruction: 0.15
+    text_replay: 0.10
+  stage3:
+    full_ocr: 0.30
+    optical_continuation: 0.50
+    span_reconstruction: 0.10
+    text_replay: 0.10

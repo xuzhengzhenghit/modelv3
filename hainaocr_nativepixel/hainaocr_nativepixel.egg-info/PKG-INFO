@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: hainaocr-nativepixel
+Version: 0.1.0
+Summary: HainaOCR-NativePixel encoder-free OCR VLM model package
+Requires-Python: >=3.10
+Requires-Dist: torch>=2.0
+Requires-Dist: transformers>=4.57
+Requires-Dist: Pillow

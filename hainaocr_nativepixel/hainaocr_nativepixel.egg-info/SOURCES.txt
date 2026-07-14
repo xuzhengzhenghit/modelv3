@@ -1,0 +1,10 @@
+pyproject.toml
+hainaocr_nativepixel/__init__.py
+hainaocr_nativepixel/configuration.py
+hainaocr_nativepixel/modeling.py
+hainaocr_nativepixel/processing.py
+hainaocr_nativepixel.egg-info/PKG-INFO
+hainaocr_nativepixel.egg-info/SOURCES.txt
+hainaocr_nativepixel.egg-info/dependency_links.txt
+hainaocr_nativepixel.egg-info/requires.txt
+hainaocr_nativepixel.egg-info/top_level.txt

@@ -1,0 +1,29 @@
+# ── Data source configuration ──
+
+source:
+  glob: "/mnt/si001719kd1w/default/xjz/data/onesci_cc_pages/pages-*.jsonl"
+  format: "compact"          # compact ({i,t,s,f}) or full ({id,blocks,...})
+  compression: null           # gzip, zstd, or null
+
+output:
+  train_dir: "/mnt/si001719kd1w/default/xjz/data/text2vision_pt/train"
+  val_dir: "/mnt/si001719kd1w/default/xjz/data/text2vision_pt/val"
+  test_dir: "/mnt/si001719kd1w/default/xjz/data/text2vision_pt/test"
+  rejects_dir: "/mnt/si001719kd1w/default/xjz/data/text2vision_pt/rejects"
+  shard_size_mb: 384
+
+preprocessing:
+  max_block_chars: 420
+  page_budget: 950
+  normalize_unicode: true
+  strip_control_chars: true
+  canonical_latex: true         # unify $/$$/equation → \(/\[)
+  sanitize_html: true
+  parse_tables: true
+  dedup_method: "sha1"          # sha1 or minhash
+  max_target_tokens: 2048       # warn if target exceeds this
+
+validation:
+  val_ratio: 0.001
+  test_ratio: 0.0005
+  seed: 42
