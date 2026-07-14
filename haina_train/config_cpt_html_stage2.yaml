@@ -32,9 +32,8 @@ data:
   samples_per_epoch: 9733672
   shuffle_files: true
 
-  # ── Pure text mixing ──
-  text_jsonl_path: "/mnt/si001719kd1w/default/xjz/data/onesci_cc_pages/pages-00001.jsonl"
-  text_ratio: 0.2
+  # ── Task mix handled by RenderDataset (A:60%, B:25%, D:15%) ──
+  text_ratio: 0.0
 
   num_workers: 2
   prefetch_factor: 2

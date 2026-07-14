@@ -99,19 +99,27 @@ class RenderDataset(IterableDataset):
     def __iter__(self) -> Iterator[dict[str, Any]]:
         worker = get_worker_info()
         wid = worker.id if worker else 0
+        nw = worker.num_workers if worker else 1
 
+        # ── DDP sharding: each rank gets 1/world_size of files ──
         files = list(self._files)
-        rng = random.Random(self._base_seed + self._epoch * 1000 + wid)
+        rng = random.Random(self._base_seed + self._epoch * 1000)
         rng.shuffle(files)
+        # Each (rank, worker) combo processes a unique subset of files
+        total_shards = max(1, self._world_size) * max(1, nw)
+        my_files = [f for i, f in enumerate(files) if i % total_shards == (self._rank * nw + wid)]
+        if not my_files:
+            my_files = files  # fallback
 
         renderer = self._get_renderer()
         count = 0
+        file_rng = random.Random(self._base_seed + self._epoch * 1000 + self._rank * 100 + wid)
 
-        for filepath in files:
+        for filepath in my_files:
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     lines = f.readlines()
-                rng.shuffle(lines)
+                file_rng.shuffle(lines)
 
                 for line in lines:
                     line = line.strip()
