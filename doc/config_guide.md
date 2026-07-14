@@ -118,6 +118,14 @@ steps_per_epoch = ceil(samples_per_epoch / effective_batch)
 total_steps     = steps_per_epoch × epochs
 ```
 
+当前 (micro_batch=2, grad_accum=16, samples_per_epoch=9,733,672):
+
+| GPU 数 | 全局 batch | steps/epoch | 每卡 samples/step |
+|--------|-----------|-------------|-------------------|
+| 1 | 32 | 304,178 | 32 |
+| 8 | 256 | 38,023 | 32 |
+| 16 | 512 | 19,012 | 32 |
+
 ### 视觉 token 规格
 
 ```text
@@ -143,15 +151,37 @@ target_text  <eos>(1)
 |<-- labels=target_ids (全部参与loss) -->|
 ```
 
-### DDP 启动
+### 启动命令
+
+**关键**: `source MX_env.sh` 必须在同一行，变量用 `&& \` 串联，否则不生效。
 
 ```bash
 # 单卡
-NPROC_PER_NODE=1 bash run_cpt_html.sh
+source /mnt/si001719bp3c/default/XJZ/modelv3/haina_train/MX_env.sh && \
+NPROC_PER_NODE=1 CONFIG=/mnt/si001719bp3c/default/XJZ/modelv3/haina_train/config_cpt_html_stage1.yaml \
+bash /mnt/si001719bp3c/default/XJZ/modelv3/haina_train/run_cpt_html.sh
 
 # 8卡
-NPROC_PER_NODE=8 bash run_cpt_html.sh
+source /mnt/si001719bp3c/default/XJZ/modelv3/haina_train/MX_env.sh && \
+NPROC_PER_NODE=8 CONFIG=/mnt/si001719bp3c/default/XJZ/modelv3/haina_train/config_cpt_html_stage1.yaml \
+bash /mnt/si001719bp3c/default/XJZ/modelv3/haina_train/run_cpt_html.sh
+
+# 16卡
+source /mnt/si001719bp3c/default/XJZ/modelv3/haina_train/MX_env.sh && \
+NPROC_PER_NODE=16 CONFIG=/mnt/si001719bp3c/default/XJZ/modelv3/haina_train/config_cpt_html_stage1.yaml \
+bash /mnt/si001719bp3c/default/XJZ/modelv3/haina_train/run_cpt_html.sh
 
 # 自定义配置
-CONFIG=config_cpt_html_stage2.yaml NPROC_PER_NODE=4 bash run_cpt_html.sh
+source /mnt/si001719bp3c/default/XJZ/modelv3/haina_train/MX_env.sh && \
+NPROC_PER_NODE=4 CONFIG=/mnt/si001719bp3c/default/XJZ/modelv3/haina_train/config_cpt_html_stage2.yaml \
+bash /mnt/si001719bp3c/default/XJZ/modelv3/haina_train/run_cpt_html.sh
+```
+
+**错误示范**（分三行写会丢失变量，变成单卡）：
+
+```bash
+# ❌ 这样不行！NPROC_PER_NODE 没传给 bash
+source MX_env.sh
+NPROC_PER_NODE=8 CONFIG=xxx.yaml
+bash run_cpt_html.sh
 ```

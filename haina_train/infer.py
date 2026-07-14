@@ -9,15 +9,14 @@ from hainaocr_nativepixel import (
     HainaOCRNativePixelConfig, HainaOCRNativePixelForConditionalGeneration,
     HainaOCRNativePixelImageProcessor,
 )
-from hainaocr_nativepixel.hainaocr_nativepixel.processing import load_tokenizer_with_fixes
+from hainaocr_nativepixel.hainaocr_nativepixel.ocr_tokenizer import OCRTokenizer
 
-# CKPT = sys.argv[1] if len(sys.argv) > 1 else '/mnt/si001719bp3c/default/XJZ/modelv3/haina_train/outputs/cpt1_html_stage1/checkpoint-00001000/model.safetensors'
-CKPT = sys.argv[1] if len(sys.argv) > 1 else '/mnt/si001719bp3c/default/XJZ/modelv3/haina_train/outputs/cpt1_html_stage1/checkpoint-latest/model.safetensors'
+CKPT = sys.argv[1] if len(sys.argv) > 1 else '/mnt/si001719bp3c/default/XJZ/modelv3/haina_train/outputs/cpt-714/checkpoint-latest/model.safetensors'
 IMAGE = sys.argv[2] if len(sys.argv) > 2 else '/mnt/si001719bp3c/default/XJZ/modelv3/tmp/preview/CC-MAIN-20251204191828-20251204221828-00044.warc_processed.jsonl.gz_12-p00000.png'
-LLM = '/mnt/si001719kd1w/default/xjz/model/qwen3_0_6b'
+TOKENIZER_DIR = '/mnt/si001719bp3c/default/XJZ/modelv3/data/ocr_vocab/tokenizer'
 PROJECT_ROOT = '/mnt/si001719bp3c/default/XJZ/modelv3/hainaocr_nativepixel'
 DEV = 'cuda'
-VS, VE, IP = 151652, 151653, 151655
+VS, VE, IP = 5, 6, 7  # OCR vocab: <|vision_start|>=5, <|vision_end|>=6, <|image_pad|>=7
 
 # Load
 config = HainaOCRNativePixelConfig.from_pretrained(PROJECT_ROOT, trust_remote_code=True)
@@ -25,7 +24,7 @@ config._attn_implementation = 'flash_attention_2'; config.use_liger_ce = False
 model = HainaOCRNativePixelForConditionalGeneration(config)
 model.load_state_dict(load_file(CKPT), strict=False)
 model.to(DEV, dtype=torch.bfloat16).eval()
-tok = load_tokenizer_with_fixes(LLM, trust_remote_code=True); tok.pad_token = tok.eos_token
+tok = OCRTokenizer.from_pretrained(TOKENIZER_DIR); tok.pad_token = tok.eos_token
 eos = tok.eos_token_id
 img_proc = HainaOCRNativePixelImageProcessor.from_pretrained(PROJECT_ROOT)
 

@@ -756,6 +756,7 @@ def train(cfg: Dict[str, Any]) -> None:
     tokens_window = 0
     samples_window = 0
     window_t0 = time.perf_counter()
+    _use_text_mixing = False  # initialized here, overridden in HTML render path
 
     if prof:
         prof.__enter__()
