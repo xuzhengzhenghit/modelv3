@@ -51,7 +51,7 @@
   "hidden_act": "silu",
   "rms_norm_eps": 1e-06,
   "rope_theta": 1000000.0,
-  "vocab_size": 18900,
+  "vocab_size": 32647,
   "tie_word_embeddings": true,
   "patch_size": 16,
   "spatial_merge_size": 2,
